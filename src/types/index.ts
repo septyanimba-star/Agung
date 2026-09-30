@@ -31,4 +31,14 @@ export interface StationData {
   longitude: number;
   status: 'active' | 'inactive' | 'maintenance';
   last_signal: string;
+  sensor_type?: string;
+  sensor_model?: string;
+  seed_code?: string;
+  network?: string;
+  sampling_rate?: number;
+  channels?: string[];
+  elevation?: number;
+  installation_date?: string;
+  region?: string;
+  province?: string;
 }

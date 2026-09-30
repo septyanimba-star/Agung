@@ -269,7 +269,7 @@ export default function App() {
       <footer className="bg-slate-900/80 border-t border-slate-800/50 px-4 py-2 flex-shrink-0">
         <div className="flex items-center justify-between text-[10px] text-slate-500">
           <span>Data: BMKG & IRIS Geofon | InaEEWS v3.1</span>
-          <span className="hidden sm:inline">{monitoringStations.length} stasiun • Push Alert aktif</span>
+          <span className="hidden sm:inline">{monitoringStations.length} sensor seismik • Push Alert aktif</span>
           <span>© 2026 InaEEWS</span>
         </div>
       </footer>
