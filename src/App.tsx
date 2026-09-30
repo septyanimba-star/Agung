@@ -7,9 +7,10 @@ import StatsPanel from './components/StatsPanel';
 import SeismicVisualizer from './components/SeismicVisualizer';
 import StationMapPanel from './components/StationMapPanel';
 import PushNotification from './components/PushNotification';
+import LocationSetup from './components/LocationSetup';
 import { recentEarthquakes, warningAlerts, monitoringStations, generateNewEarthquake } from './data/earthquakes';
 import { Earthquake } from './types';
-import { Bell, BellOff, X, ChevronDown, ChevronUp, RefreshCw, Map } from 'lucide-react';
+import { Bell, BellOff, X, ChevronDown, ChevronUp, RefreshCw, Map, MapPin } from 'lucide-react';
 
 export default function App() {
   const [earthquakes, setEarthquakes] = useState<Earthquake[]>(recentEarthquakes);
@@ -20,12 +21,19 @@ export default function App() {
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Receiver location state
+  const [receiverLocation, setReceiverLocation] = useState<{
+    lat: number;
+    lon: number;
+    name?: string;
+  } | null>(null);
+  const [showLocationSetup, setShowLocationSetup] = useState(false);
+
   // Push notification state
   const [pushAlert, setPushAlert] = useState<{
     show: boolean;
     earthquake: Earthquake | null;
-    countdown: number;
-  }>({ show: false, earthquake: null, countdown: 0 });
+  }>({ show: false, earthquake: null });
 
   // Simulate real-time earthquake detection
   useEffect(() => {
@@ -35,11 +43,10 @@ export default function App() {
         setEarthquakes(prev => [newQuake, ...prev].slice(0, 30));
         
         // Show push notification for significant earthquakes
-        if (notifications && newQuake.magnitude >= 5.0 && newQuake.s_wave_arrival) {
+        if (notifications && newQuake.magnitude >= 5.0) {
           setPushAlert({
             show: true,
             earthquake: newQuake,
-            countdown: newQuake.s_wave_arrival || 30,
           });
         }
         
@@ -49,33 +56,16 @@ export default function App() {
     return () => clearInterval(interval);
   }, [notifications]);
 
-  // Countdown timer for push notification
-  useEffect(() => {
-    if (!pushAlert.show || !pushAlert.earthquake) return;
-    
-    if (pushAlert.countdown <= 0) {
-      setPushAlert(prev => ({ ...prev, show: false }));
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setPushAlert(prev => ({ ...prev, countdown: prev.countdown - 1 }));
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [pushAlert.show, pushAlert.countdown]);
-
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
     setTimeout(() => {
       const newQuake = generateNewEarthquake();
       setEarthquakes(prev => [newQuake, ...prev].slice(0, 30));
       
-      if (notifications && newQuake.magnitude >= 5.0 && newQuake.s_wave_arrival) {
+      if (notifications && newQuake.magnitude >= 5.0) {
         setPushAlert({
           show: true,
           earthquake: newQuake,
-          countdown: newQuake.s_wave_arrival || 30,
         });
       }
       
@@ -102,11 +92,24 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
       <Header />
       
+      {/* LOCATION SETUP MODAL */}
+      {showLocationSetup && (
+        <LocationSetup
+          onLocationSet={(lat, lon, name) => {
+            setReceiverLocation({ lat, lon, name });
+            setShowLocationSetup(false);
+          }}
+          onClose={() => setShowLocationSetup(false)}
+        />
+      )}
+
       {/* PUSH NOTIFICATION OVERLAY - TAMPIL DI LAYAR */}
       <PushNotification
         show={pushAlert.show}
         earthquake={pushAlert.earthquake}
-        countdown={pushAlert.countdown}
+        receiverLat={receiverLocation?.lat ?? null}
+        receiverLon={receiverLocation?.lon ?? null}
+        receiverName={receiverLocation?.name}
         onClose={() => setPushAlert(prev => ({ ...prev, show: false }))}
       />
 
@@ -268,8 +271,17 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-slate-900/80 border-t border-slate-800/50 px-4 py-2 flex-shrink-0">
         <div className="flex items-center justify-between text-[10px] text-slate-500">
-          <span>Data: BMKG & IRIS Geofon | InaEEWS v3.1</span>
-          <span className="hidden sm:inline">{monitoringStations.length} sensor seismik • Push Alert aktif</span>
+          <span>Data: BMKG & IRIS Geofon | InaEEWS v3.2</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowLocationSetup(true)}
+              className="flex items-center gap-1 px-2 py-0.5 bg-blue-900/30 hover:bg-blue-800/50 border border-blue-700/50 rounded text-blue-400 transition-colors"
+            >
+              <MapPin className="w-3 h-3" />
+              {receiverLocation ? receiverLocation.name || 'Lokasi diatur' : 'Atur Lokasi'}
+            </button>
+            <span className="hidden sm:inline">{monitoringStations.length} sensor seismik • Push Alert aktif</span>
+          </div>
           <span>© 2026 InaEEWS</span>
         </div>
       </footer>
