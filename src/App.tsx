@@ -6,6 +6,7 @@ import WarningPanel from './components/WarningPanel';
 import StatsPanel from './components/StatsPanel';
 import SeismicVisualizer from './components/SeismicVisualizer';
 import StationMapPanel from './components/StationMapPanel';
+import PushNotification from './components/PushNotification';
 import { recentEarthquakes, warningAlerts, monitoringStations, generateNewEarthquake } from './data/earthquakes';
 import { Earthquake } from './types';
 import { Bell, BellOff, X, ChevronDown, ChevronUp, RefreshCw, Map } from 'lucide-react';
@@ -14,39 +15,74 @@ export default function App() {
   const [earthquakes, setEarthquakes] = useState<Earthquake[]>(recentEarthquakes);
   const [selectedEarthquake, setSelectedEarthquake] = useState<Earthquake | null>(null);
   const [notifications, setNotifications] = useState(true);
-  const [showNotification, setShowNotification] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'earthquakes' | 'warnings' | 'stations' | 'gmap'>('earthquakes');
   const [showMobilePanel, setShowMobilePanel] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showGmapModal, setShowGmapModal] = useState(false);
 
+  // Push notification state
+  const [pushAlert, setPushAlert] = useState<{
+    show: boolean;
+    earthquake: Earthquake | null;
+    countdown: number;
+  }>({ show: false, earthquake: null, countdown: 0 });
+
+  // Simulate real-time earthquake detection
   useEffect(() => {
     const interval = setInterval(() => {
       if (Math.random() > 0.6) {
         const newQuake = generateNewEarthquake();
         setEarthquakes(prev => [newQuake, ...prev].slice(0, 30));
-        if (notifications && newQuake.magnitude >= 5) {
-          setNotificationMessage(`Gempa M${newQuake.magnitude.toFixed(1)} terdeteksi di ${newQuake.location}`);
-          setShowNotification(true);
-          setTimeout(() => setShowNotification(false), 6000);
+        
+        // Show push notification for significant earthquakes
+        if (notifications && newQuake.magnitude >= 5.0 && newQuake.s_wave_arrival) {
+          setPushAlert({
+            show: true,
+            earthquake: newQuake,
+            countdown: newQuake.s_wave_arrival || 30,
+          });
         }
+        
         setLastUpdate(new Date());
       }
-    }, 12000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [notifications]);
+
+  // Countdown timer for push notification
+  useEffect(() => {
+    if (!pushAlert.show || !pushAlert.earthquake) return;
+    
+    if (pushAlert.countdown <= 0) {
+      setPushAlert(prev => ({ ...prev, show: false }));
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setPushAlert(prev => ({ ...prev, countdown: prev.countdown - 1 }));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [pushAlert.show, pushAlert.countdown]);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
     setTimeout(() => {
       const newQuake = generateNewEarthquake();
       setEarthquakes(prev => [newQuake, ...prev].slice(0, 30));
+      
+      if (notifications && newQuake.magnitude >= 5.0 && newQuake.s_wave_arrival) {
+        setPushAlert({
+          show: true,
+          earthquake: newQuake,
+          countdown: newQuake.s_wave_arrival || 30,
+        });
+      }
+      
       setLastUpdate(new Date());
       setIsRefreshing(false);
     }, 1000);
-  }, []);
+  }, [notifications]);
 
   const handleSelectEarthquake = (eq: Earthquake) => {
     setSelectedEarthquake(eq);
@@ -66,102 +102,17 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
       <Header />
       
-      {/* Notification Toast */}
-      {showNotification && (
-        <div className="fixed top-20 right-4 z-[9999] animate-slide-in">
-          <div className="bg-slate-800 border border-orange-600/50 rounded-xl p-4 shadow-2xl shadow-orange-900/30 max-w-sm">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-8 h-8 bg-orange-600/20 rounded-lg flex items-center justify-center">
-                <Bell className="w-4 h-4 text-orange-400 animate-bounce" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-orange-300">🔔 Gempa Baru Terdeteksi!</p>
-                <p className="text-xs text-slate-300 mt-0.5">{notificationMessage}</p>
-                <p className="text-[10px] text-slate-500 mt-1">Data: IRIS Geofon / BMKG</p>
-              </div>
-              <button onClick={() => setShowNotification(false)} className="text-slate-400 hover:text-white">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Google Maps Full Modal */}
-      {showGmapModal && (
-        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-2xl border border-slate-700/50 w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="px-5 py-3 border-b border-slate-700/50 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center">
-                  <Map className="w-4 h-4 text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Peta Google - 100 Stasiun BMKG</h3>
-                  <p className="text-[10px] text-slate-400">Jaringan Monitoring Seismik Indonesia</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <a
-                  href={`https://www.google.com/maps/place/Indonesia/@-2.5,118.0,5z`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
-                  </svg>
-                  Buka Google Maps
-                </a>
-                <button
-                  onClick={() => setShowGmapModal(false)}
-                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5 text-slate-300" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 relative">
-              <iframe
-                src="https://maps.google.com/maps?q=Indonesia&z=5&output=embed"
-                className="w-full h-full"
-                style={{ border: 0 }}
-                allowFullScreen
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                title="Peta Google Full - Stasiun BMKG"
-              />
-              {/* Quick region links */}
-              <div className="absolute bottom-4 left-4 right-4 flex flex-wrap gap-2">
-                {[
-                  { name: '🏝️ Maluku', lat: -3.5, lng: 128 },
-                  { name: '🌋 Sulut', lat: 1.3, lng: 124.8 },
-                  { name: '🗻 Jawa', lat: -7.0, lng: 110.0 },
-                  { name: '🌊 Sumatera', lat: 0.0, lng: 100.0 },
-                  { name: '🏔️ Papua', lat: -2.5, lng: 138.0 },
-                  { name: '🌴 NTT', lat: -10.0, lng: 123.0 },
-                ].map(region => (
-                  <a
-                    key={region.name}
-                    href={`https://www.google.com/maps/@${region.lat},${region.lng},7z`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1.5 bg-slate-900/90 backdrop-blur-sm border border-slate-700/50 rounded-full text-[10px] text-white font-medium hover:bg-slate-800 transition-colors"
-                  >
-                    {region.name}
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* PUSH NOTIFICATION OVERLAY - TAMPIL DI LAYAR */}
+      <PushNotification
+        show={pushAlert.show}
+        earthquake={pushAlert.earthquake}
+        countdown={pushAlert.countdown}
+        onClose={() => setPushAlert(prev => ({ ...prev, show: false }))}
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col lg:flex-row gap-0 overflow-hidden">
-        {/* Left Panel - Map */}
+        {/* Left Panel - Map & Seismic */}
         <div className="flex-1 flex flex-col min-h-0">
           {/* Stats Bar */}
           <div className="px-4 py-3 bg-slate-900/50 border-b border-slate-800/50 flex-shrink-0">
@@ -172,19 +123,22 @@ export default function App() {
             />
           </div>
 
-          {/* Main Map */}
-          <div className="flex-1 p-4 min-h-[350px]">
-            <MapView
-              earthquakes={earthquakes}
-              stations={monitoringStations}
-              selectedEarthquake={selectedEarthquake}
-              onSelectEarthquake={handleSelectEarthquake}
-            />
-          </div>
+          {/* Seismic Visualizer + Map - SEJAJAR */}
+          <div className="flex-1 flex flex-col lg:flex-row gap-0 min-h-0">
+            {/* Seismic Visualizer - DI ATAS/SEBELAH KIRI */}
+            <div className="lg:w-80 xl:w-96 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-slate-800/50 p-4 flex flex-col">
+              <SeismicVisualizer earthquake={selectedEarthquake} />
+            </div>
 
-          {/* Seismic Visualizer */}
-          <div className="px-4 pb-4 flex-shrink-0">
-            <SeismicVisualizer earthquake={selectedEarthquake} />
+            {/* Main Map */}
+            <div className="flex-1 p-4 min-h-[300px]">
+              <MapView
+                earthquakes={earthquakes}
+                stations={monitoringStations}
+                selectedEarthquake={selectedEarthquake}
+                onSelectEarthquake={handleSelectEarthquake}
+              />
+            </div>
           </div>
         </div>
 
@@ -314,18 +268,13 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-slate-900/80 border-t border-slate-800/50 px-4 py-2 flex-shrink-0">
         <div className="flex items-center justify-between text-[10px] text-slate-500">
-          <span>Data: BMKG & IRIS Geofon | InaEEWS v3.0</span>
-          <span className="hidden sm:inline">{monitoringStations.length} stasiun • {earthquakes.length} event • Sulawesi Utara & Maluku prioritized</span>
+          <span>Data: BMKG & IRIS Geofon | InaEEWS v3.1</span>
+          <span className="hidden sm:inline">{monitoringStations.length} stasiun • Push Alert aktif</span>
           <span>© 2026 InaEEWS</span>
         </div>
       </footer>
 
       <style>{`
-        @keyframes slide-in {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        .animate-slide-in { animation: slide-in 0.3s ease-out; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -335,7 +284,7 @@ export default function App() {
   );
 }
 
-// Google Maps Tab - lightweight, loads only when clicked
+// Google Maps Tab
 function GoogleMapsTab() {
   const [loaded, setLoaded] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
@@ -370,7 +319,6 @@ function GoogleMapsTab() {
         </h2>
         <p className="text-[10px] text-slate-400">Pilih wilayah untuk zoom atau lihat seluruh Indonesia</p>
         
-        {/* Region buttons */}
         <div className="flex flex-wrap gap-1.5 mt-2">
           <button
             onClick={() => setSelectedRegion(null)}
@@ -394,7 +342,6 @@ function GoogleMapsTab() {
         </div>
       </div>
 
-      {/* Map */}
       <div className="flex-1 relative">
         {!loaded && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
@@ -417,7 +364,6 @@ function GoogleMapsTab() {
         />
       </div>
 
-      {/* Open in Google Maps button */}
       <div className="px-4 py-2 border-t border-slate-700/50 flex-shrink-0">
         <a
           href={selectedRegion 
