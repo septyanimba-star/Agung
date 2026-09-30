@@ -1,52 +1,60 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import MapView from './components/MapView';
 import EarthquakeList from './components/EarthquakeList';
 import WarningPanel from './components/WarningPanel';
 import StatsPanel from './components/StatsPanel';
 import SeismicVisualizer from './components/SeismicVisualizer';
-import { recentEarthquakes, warningAlerts, monitoringStations } from './data/earthquakes';
+import { recentEarthquakes, warningAlerts, monitoringStations, generateNewEarthquake } from './data/earthquakes';
 import { Earthquake } from './types';
-import { Bell, BellOff, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bell, BellOff, X, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 
 export default function App() {
+  const [earthquakes, setEarthquakes] = useState<Earthquake[]>(recentEarthquakes);
   const [selectedEarthquake, setSelectedEarthquake] = useState<Earthquake | null>(null);
   const [notifications, setNotifications] = useState(true);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'earthquakes' | 'warnings'>('earthquakes');
   const [showMobilePanel, setShowMobilePanel] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Simulate real-time earthquake detection
+  // Simulate real-time earthquake detection with new data
   useEffect(() => {
     const interval = setInterval(() => {
-      if (Math.random() > 0.85) {
-        const newQuake = {
-          id: `EQ-2026-${String(Math.floor(Math.random() * 900) + 100).padStart(3, '0')}`,
-          magnitude: 3 + Math.random() * 3,
-          depth: Math.floor(10 + Math.random() * 80),
-          latitude: -8 + Math.random() * 12,
-          longitude: 100 + Math.random() * 40,
-          location: ['Sulawesi', 'Maluku', 'NTB', 'NTT', 'Papua', 'Banten', 'Lampung'][Math.floor(Math.random() * 7)],
-          region: 'Deteksi otomatis IRIS Geofon',
-          timestamp: new Date().toISOString(),
-          status: 'preliminary' as const,
-          tsunami_potential: false,
-          felt_intensity: Math.floor(1 + Math.random() * 3),
-          p_wave_arrival: Math.floor(8 + Math.random() * 20),
-          s_wave_arrival: Math.floor(18 + Math.random() * 40),
-        };
+      if (Math.random() > 0.6) {
+        const newQuake = generateNewEarthquake();
+        
+        setEarthquakes(prev => {
+          const updated = [newQuake, ...prev];
+          // Keep max 30 earthquakes
+          return updated.slice(0, 30);
+        });
 
         if (notifications && newQuake.magnitude >= 5) {
           setNotificationMessage(`Gempa M${newQuake.magnitude.toFixed(1)} terdeteksi di ${newQuake.location}`);
           setShowNotification(true);
-          setTimeout(() => setShowNotification(false), 5000);
+          setTimeout(() => setShowNotification(false), 6000);
         }
+
+        setLastUpdate(new Date());
       }
-    }, 15000);
+    }, 12000);
 
     return () => clearInterval(interval);
   }, [notifications]);
+
+  // Manual refresh
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      const newQuake = generateNewEarthquake();
+      setEarthquakes(prev => [newQuake, ...prev].slice(0, 30));
+      setLastUpdate(new Date());
+      setIsRefreshing(false);
+    }, 1000);
+  }, []);
 
   const handleSelectEarthquake = (eq: Earthquake) => {
     setSelectedEarthquake(eq);
@@ -56,6 +64,13 @@ export default function App() {
   };
 
   const activeStationCount = monitoringStations.filter(s => s.status === 'active').length;
+
+  const formatLastUpdate = () => {
+    const diff = Math.floor((Date.now() - lastUpdate.getTime()) / 1000);
+    if (diff < 60) return `${diff}s lalu`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m lalu`;
+    return `${Math.floor(diff / 3600)}j lalu`;
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
@@ -70,8 +85,9 @@ export default function App() {
                 <Bell className="w-4 h-4 text-orange-400 animate-bounce" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-orange-300">Gempa Terdeteksi!</p>
+                <p className="text-sm font-semibold text-orange-300">🔔 Gempa Baru Terdeteksi!</p>
                 <p className="text-xs text-slate-300 mt-0.5">{notificationMessage}</p>
+                <p className="text-[10px] text-slate-500 mt-1">Data: IRIS Geofon / BMKG</p>
               </div>
               <button onClick={() => setShowNotification(false)} className="text-slate-400 hover:text-white">
                 <X className="w-4 h-4" />
@@ -88,7 +104,7 @@ export default function App() {
           {/* Stats Bar */}
           <div className="px-4 py-3 bg-slate-900/50 border-b border-slate-800/50">
             <StatsPanel
-              earthquakes={recentEarthquakes}
+              earthquakes={earthquakes}
               stationCount={monitoringStations.length}
               activeStationCount={activeStationCount}
             />
@@ -97,7 +113,7 @@ export default function App() {
           {/* Map */}
           <div className="flex-1 p-4 min-h-[400px]">
             <MapView
-              earthquakes={recentEarthquakes}
+              earthquakes={earthquakes}
               stations={monitoringStations}
               selectedEarthquake={selectedEarthquake}
               onSelectEarthquake={handleSelectEarthquake}
@@ -154,7 +170,7 @@ export default function App() {
           <div className="flex-1 overflow-hidden">
             {activeTab === 'earthquakes' ? (
               <EarthquakeList
-                earthquakes={recentEarthquakes}
+                earthquakes={earthquakes}
                 selectedId={selectedEarthquake?.id || null}
                 onSelect={handleSelectEarthquake}
               />
@@ -168,19 +184,31 @@ export default function App() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-xs text-slate-400">IRIS Geofon Feed</span>
+                <span className="text-xs text-slate-400">
+                  IRIS Geofon • {formatLastUpdate()}
+                </span>
               </div>
-              <button
-                onClick={() => setNotifications(!notifications)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  notifications
-                    ? 'bg-green-900/30 text-green-400 border border-green-700/50'
-                    : 'bg-slate-800 text-slate-400 border border-slate-700/50'
-                }`}
-              >
-                {notifications ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
-                {notifications ? 'Notif ON' : 'Notif OFF'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700/50 hover:bg-slate-700 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+                <button
+                  onClick={() => setNotifications(!notifications)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    notifications
+                      ? 'bg-green-900/30 text-green-400 border border-green-700/50'
+                      : 'bg-slate-800 text-slate-400 border border-slate-700/50'
+                  }`}
+                >
+                  {notifications ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
+                  {notifications ? 'ON' : 'OFF'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -201,8 +229,8 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-slate-900/80 border-t border-slate-800/50 px-4 py-2">
         <div className="flex items-center justify-between text-[10px] text-slate-500">
-          <span>Data: BMKG & IRIS Geofon | InaEEWS v2.1.0</span>
-          <span className="hidden sm:inline">Sistem Peringatan Dini Gempa Bumi Indonesia</span>
+          <span>Data: BMKG & IRIS Geofon | InaEEWS v2.2.0</span>
+          <span className="hidden sm:inline">Sistem Peringatan Dini Gempa Bumi Indonesia • {earthquakes.length} event dimonitor</span>
           <span>© 2026 InaEEWS</span>
         </div>
       </footer>

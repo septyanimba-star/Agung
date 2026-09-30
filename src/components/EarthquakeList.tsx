@@ -1,5 +1,5 @@
 import { Earthquake } from '../types';
-import { MapPin, Clock, Waves, AlertTriangle } from 'lucide-react';
+import { MapPin, Clock, Waves, AlertTriangle, Zap } from 'lucide-react';
 
 interface EarthquakeListProps {
   earthquakes: Earthquake[];
@@ -24,15 +24,30 @@ export default function EarthquakeList({ earthquakes, selectedId, onSelect }: Ea
     return 'border-lime-500/50 shadow-lime-800/20';
   };
 
+  const getRelativeTime = (timestamp: string) => {
+    const now = Date.now();
+    const then = new Date(timestamp).getTime();
+    const diffSeconds = Math.floor((now - then) / 1000);
+    
+    if (diffSeconds < 60) return `${diffSeconds}s lalu`;
+    if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m lalu`;
+    if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}j lalu`;
+    return `${Math.floor(diffSeconds / 86400)}h lalu`;
+  };
+
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
   };
 
-  const formatDate = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', timeZone: 'Asia/Jakarta' });
+  const isNew = (timestamp: string) => {
+    const diff = Date.now() - new Date(timestamp).getTime();
+    return diff < 300000; // Less than 5 minutes
   };
+
+  const sortedEarthquakes = [...earthquakes].sort((a, b) => 
+    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
 
   return (
     <div className="h-full flex flex-col">
@@ -47,7 +62,7 @@ export default function EarthquakeList({ earthquakes, selectedId, onSelect }: Ea
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {earthquakes.map((eq) => (
+        {sortedEarthquakes.map((eq) => (
           <div
             key={eq.id}
             onClick={() => onSelect(eq)}
@@ -56,8 +71,11 @@ export default function EarthquakeList({ earthquakes, selectedId, onSelect }: Ea
             }`}
           >
             <div className="flex items-start gap-3">
-              <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg shadow-lg ${getMagnitudeColor(eq.magnitude)} ${getMagnitudeBorder(eq.magnitude)}`}>
+              <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg shadow-lg relative ${getMagnitudeColor(eq.magnitude)} ${getMagnitudeBorder(eq.magnitude)}`}>
                 {eq.magnitude.toFixed(1)}
+                {isNew(eq.timestamp) && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border border-white/30" />
+                )}
               </div>
               
               <div className="flex-1 min-w-0">
@@ -69,6 +87,12 @@ export default function EarthquakeList({ earthquakes, selectedId, onSelect }: Ea
                       TSUNAMI
                     </span>
                   )}
+                  {isNew(eq.timestamp) && (
+                    <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] bg-green-900/50 text-green-400 px-1.5 py-0.5 rounded border border-green-700/50">
+                      <Zap className="w-3 h-3" />
+                      BARU
+                    </span>
+                  )}
                 </div>
                 
                 <p className="text-xs text-slate-400 truncate mt-0.5">{eq.region}</p>
@@ -76,7 +100,7 @@ export default function EarthquakeList({ earthquakes, selectedId, onSelect }: Ea
                 <div className="flex items-center gap-3 mt-1.5">
                   <span className="flex items-center gap-1 text-[10px] text-slate-500">
                     <Clock className="w-3 h-3" />
-                    {formatTime(eq.timestamp)}
+                    {getRelativeTime(eq.timestamp)}
                   </span>
                   <span className="flex items-center gap-1 text-[10px] text-slate-500">
                     <MapPin className="w-3 h-3" />
@@ -101,12 +125,18 @@ export default function EarthquakeList({ earthquakes, selectedId, onSelect }: Ea
                       <div className="w-1.5 h-1.5 bg-red-400 rounded-full" />
                       <span className="text-[10px] text-red-400">S: {eq.s_wave_arrival}s</span>
                     </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-slate-500">
+                        Δt: {eq.s_wave_arrival - eq.p_wave_arrival}s
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
 
               <div className="flex-shrink-0 text-right">
-                <span className="text-[10px] text-slate-500">{formatDate(eq.timestamp)}</span>
+                <span className="text-[10px] text-slate-500">{formatTime(eq.timestamp)}</span>
+                <span className="text-[9px] text-slate-600 block">WIB</span>
               </div>
             </div>
           </div>
