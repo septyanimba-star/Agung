@@ -11,6 +11,7 @@ import LocationSetup from './components/LocationSetup';
 import { recentEarthquakes, warningAlerts, monitoringStations, generateNewEarthquake } from './data/earthquakes';
 import { Earthquake } from './types';
 import { Bell, BellOff, X, ChevronDown, ChevronUp, RefreshCw, Map, MapPin } from 'lucide-react';
+import { calculateDistance, estimateIntensity } from './utils/seismicCalc';
 
 export default function App() {
   const [earthquakes, setEarthquakes] = useState<Earthquake[]>(recentEarthquakes);
@@ -42,19 +43,30 @@ export default function App() {
         const newQuake = generateNewEarthquake();
         setEarthquakes(prev => [newQuake, ...prev].slice(0, 30));
         
-        // Show push notification for significant earthquakes
-        if (notifications && newQuake.magnitude >= 5.0) {
-          setPushAlert({
-            show: true,
-            earthquake: newQuake,
-          });
+        // Show push notification only if MMI >= 3 at receiver location
+        if (notifications && receiverLocation) {
+          const distance = calculateDistance(
+            newQuake.latitude,
+            newQuake.longitude,
+            receiverLocation.lat,
+            receiverLocation.lon
+          );
+          const estimatedMMI = estimateIntensity(newQuake.magnitude, distance);
+          
+          // Only show notification if intensity is MMI 3 or higher
+          if (estimatedMMI >= 3) {
+            setPushAlert({
+              show: true,
+              earthquake: newQuake,
+            });
+          }
         }
         
         setLastUpdate(new Date());
       }
     }, 15000);
     return () => clearInterval(interval);
-  }, [notifications]);
+  }, [notifications, receiverLocation]);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -62,17 +74,29 @@ export default function App() {
       const newQuake = generateNewEarthquake();
       setEarthquakes(prev => [newQuake, ...prev].slice(0, 30));
       
-      if (notifications && newQuake.magnitude >= 5.0) {
-        setPushAlert({
-          show: true,
-          earthquake: newQuake,
-        });
+      // Show push notification only if MMI >= 3 at receiver location
+      if (notifications && receiverLocation) {
+        const distance = calculateDistance(
+          newQuake.latitude,
+          newQuake.longitude,
+          receiverLocation.lat,
+          receiverLocation.lon
+        );
+        const estimatedMMI = estimateIntensity(newQuake.magnitude, distance);
+        
+        // Only show notification if intensity is MMI 3 or higher
+        if (estimatedMMI >= 3) {
+          setPushAlert({
+            show: true,
+            earthquake: newQuake,
+          });
+        }
       }
       
       setLastUpdate(new Date());
       setIsRefreshing(false);
     }, 1000);
-  }, [notifications]);
+  }, [notifications, receiverLocation]);
 
   const handleSelectEarthquake = (eq: Earthquake) => {
     setSelectedEarthquake(eq);
@@ -271,7 +295,7 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-slate-900/80 border-t border-slate-800/50 px-4 py-2 flex-shrink-0">
         <div className="flex items-center justify-between text-[10px] text-slate-500">
-          <span>Data: BMKG & IRIS Geofon | InaEEWS v3.2</span>
+          <span>Data: BMKG & IRIS Geofon | InaEEWS v3.3</span>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowLocationSetup(true)}
@@ -280,7 +304,7 @@ export default function App() {
               <MapPin className="w-3 h-3" />
               {receiverLocation ? receiverLocation.name || 'Lokasi diatur' : 'Atur Lokasi'}
             </button>
-            <span className="hidden sm:inline">{monitoringStations.length} sensor seismik • Push Alert aktif</span>
+            <span className="hidden sm:inline">{monitoringStations.length} sensor • Notif MMI ≥ 3</span>
           </div>
           <span>© 2026 InaEEWS</span>
         </div>
