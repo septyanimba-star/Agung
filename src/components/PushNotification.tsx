@@ -162,7 +162,7 @@ export default function PushNotification({
               <h2 className={`text-lg font-bold ${config.text}`}>
                 {isCritical ? '⚠️ PERINGATAN TSUNAMI' : isDanger ? '🚨 GEMPA KUAT' : '⚡ GEMPA TERDETEKSI'}
               </h2>
-              <p className="text-xs text-slate-400">Sistem Peringatan Dini InaEEWS</p>
+              <p className="text-xs text-slate-400">Sistem Peringatan Dini Indonesia Gempa Bumi</p>
             </div>
           </div>
 

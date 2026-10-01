@@ -30,10 +30,10 @@ export default function Header() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white tracking-tight">
-                  InaEEWS
+                  Indonesia Gempa Bumi
                 </h1>
                 <p className="text-[10px] text-blue-300 -mt-1 tracking-wider">
-                  INDONESIA EARTHQUAKE EARLY WARNING SYSTEM
+                  SISTEM PERINGATAN DINI GEMPA BUMI
                 </p>
               </div>
             </div>

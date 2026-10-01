@@ -295,7 +295,7 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-slate-900/80 border-t border-slate-800/50 px-4 py-2 flex-shrink-0">
         <div className="flex items-center justify-between text-[10px] text-slate-500">
-          <span>Data: BMKG & IRIS Geofon | InaEEWS v3.3</span>
+          <span>Data: BMKG & IRIS Geofon | Indonesia Gempa Bumi v3.3</span>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowLocationSetup(true)}
@@ -306,7 +306,7 @@ export default function App() {
             </button>
             <span className="hidden sm:inline">{monitoringStations.length} sensor • Notif MMI ≥ 3</span>
           </div>
-          <span>© 2026 InaEEWS</span>
+          <span>© 2026 Indonesia Gempa Bumi</span>
         </div>
       </footer>
 
